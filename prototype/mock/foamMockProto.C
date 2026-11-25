@@ -5,7 +5,9 @@
 
 int main(int argc, char* argv[])
 {
-    int prov; MPI_Init_thread(&argc, &argv, MPI_THREAD_SINGLE, &prov);
+    bool thr = false;  // -mpi-threads, as in OpenFOAM's argList
+    for (int i = 1; i < argc; ++i) if (!std::strcmp(argv[i], "-mpi-threads")) thr = true;
+    int prov; MPI_Init_thread(&argc, &argv, thr ? MPI_THREAD_MULTIPLE : MPI_THREAD_SINGLE, &prov);
     int* app = nullptr; int flag = 0, appNum = 0;
     MPI_Comm_get_attr(MPI_COMM_WORLD, MPI_APPNUM, &app, &flag);
     if (flag) appNum = *app;

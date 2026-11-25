@@ -2,16 +2,24 @@
 """Toy DemSide: does what yade.mpy.configure() does at import, then the bridge."""
 import sys
 import numpy as np
+import os
 from mpi4py import MPI
 
 MAGIC, VERSION = 0x50474644, 2
 world = MPI.COMM_WORLD
-comm = world.Split(3, 0)          # verbatim from yade-pgf py/mpy.py:211
+YADE = os.environ.get("DEM_YADE") == "1"
+if YADE:                          # real Yade: importing mpy does the split (yade-pgf py/mpy.py:197-223)
+    from yade import mpy
+    comm = mpy.comm
+    O.bodies.append([sphere((0, 0, 2.0 * i), 0.5) for i in range(3)])
+    O.engines = [ForceResetter(), InsertionSortCollider([Bo1_Sphere_Aabb()]), NewtonIntegrator(gravity=(0, 0, -9.81))]
+    O.dt = 1e-4
+else:
+    comm = world.Split(3, 0)      # verbatim from yade-pgf py/mpy.py:211
 assert comm.Get_parent() == MPI.COMM_NULL
 r, n = comm.Get_rank(), comm.Get_size()
 print(f"dem: world rank {world.Get_rank()}/{world.Get_size()}, sub rank {r}/{n}, appnum {world.Get_attr(MPI.APPNUM)}", flush=True)
 
-import os
 D=os.environ.get("BDEBUG")
 def dbg(m):
     if D: print("dem dbg", world.Get_rank(), m, flush=True)
@@ -19,12 +27,15 @@ dbg("pre-dup")
 bridge = world.Dup()
 dbg("dup")
 bridge.Set_errhandler(MPI.ERRORS_RETURN)
-hs = np.array([MAGIC, VERSION, 0], dtype=np.intc)
-allhs = np.empty(3 * bridge.Get_size(), dtype=np.intc)
+thr = MPI.Query_thread()           # mpi4py default: MPI_THREAD_MULTIPLE
+hs = np.array([MAGIC, VERSION, 0, thr], dtype=np.intc)
+allhs = np.empty(4 * bridge.Get_size(), dtype=np.intc)
 bridge.Allgather(hs, allhs)
-allhs = allhs.reshape(-1, 3)
+allhs = allhs.reshape(-1, 4)
 dbg("handshake")
-assert (allhs[:, 0] == MAGIC).all() and (allhs[:, 1] == VERSION).all()
+if not ((allhs[:, 0] == MAGIC).all() and (allhs[:, 1] == VERSION).all() and (allhs[:, 3] == thr).all()):
+    print(f"[bridge] handshake mismatch (thread levels {allhs[:, 3].tolist()})", file=sys.stderr, flush=True)
+    world.Abort(3)
 isFoam = allhs[:, 2] == 1
 foamRoot = int(np.argmax(isFoam))
 peers = [int(i) for i in np.nonzero(isFoam)[0]]
@@ -53,11 +64,13 @@ while not done:
     if r == 0:
         print(f"dem: step {step} dt {ctl[0]:g} particles {tot} ok", flush=True)
     done = ctl[1] > 0.5
+    if YADE:
+        O.step()                  # real DEM step between exchanges
     step += 1
 
 bridge.Barrier()
 graph.Free()
 bridge.Free()
 if r == 0:
-    print("dem: RUN FINISH", flush=True)
+    print("dem: RUN FINISH" + (f" (yade, O.iter {O.iter})" if YADE else ""), flush=True)
 # mpi4py finalizes at exit

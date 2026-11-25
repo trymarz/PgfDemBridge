@@ -39,17 +39,19 @@ struct Bridge
         MPI_Comm_size(bridge, &n);
         MPI_Comm_rank(bridge, &me);
 
-        int hs[3] = {MAGIC, VERSION, isFoam ? 1 : 0};
-        std::vector<int> all(3*n);
-        check(MPI_Allgather(hs, 3, MPI_INT, all.data(), 3, MPI_INT, bridge), "handshake", bridge);
+        // MPICH picks collective algorithms by thread level, so unequal levels deadlock.
+        int thr = 0; MPI_Query_thread(&thr);
+        int hs[4] = {MAGIC, VERSION, isFoam ? 1 : 0, thr};
+        std::vector<int> all(4*n);
+        check(MPI_Allgather(hs, 4, MPI_INT, all.data(), 4, MPI_INT, bridge), "handshake", bridge);
         for (int r = 0; r < n; ++r)
         {
-            if (all[3*r] != MAGIC || all[3*r+1] != VERSION)
+            if (all[4*r] != MAGIC || all[4*r+1] != VERSION || all[4*r+3] != thr)
             {
-                std::fprintf(stderr, "[bridge] handshake mismatch from rank %d\n", r);
+                std::fprintf(stderr, "[bridge] handshake mismatch from rank %d (thread level %d vs %d)\n", r, all[4*r+3], thr);
                 MPI_Abort(MPI_COMM_WORLD, 3);
             }
-            const bool rFoam = all[3*r+2];
+            const bool rFoam = all[4*r+2];
             if (rFoam && foamRoot < 0) foamRoot = r;
             if (rFoam != isFoam) peers.push_back(r);
         }

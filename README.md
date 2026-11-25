@@ -31,6 +31,7 @@ The core will be plain C++17 and MPI, used by both sides:
   4. `dt` and a DONE flag.
 - **Shutdown:** barrier, free the bridge, then each program closes MPI normally. There is no disconnect.
 - **Failure:** a fatal error on either side calls `MPI_Abort(MPI_COMM_WORLD)`, which ends both programs.
+- **Same MPI thread level on both sides.** MPICH picks its collective algorithms by thread level, so a Foam rank in `MPI_THREAD_SINGLE` and a DEM rank in `MPI_THREAD_MULTIPLE` deadlock in the first barrier. mpi4py (and so Yade) asks for `MPI_THREAD_MULTIPLE`, so OpenFOAM runs with `-mpi-threads`. The handshake compares the levels and aborts on a mismatch instead of hanging.
 
 ![Launch](prototype/doc/3-launch.png)
 
@@ -45,6 +46,16 @@ This avoids a crash on Debian 13: there, Open MPI 5.0.7 segfaults (in PMIx `PMIx
 | MPICH, Intel MPI (Hydra) | `PMI_RANK` |
 | Slurm `srun` | `SLURM_PROCID` |
 
+## Decisions (porousGasificationFoam#328)
+
+| # | Question | Decision |
+|---|---|---|
+| D1 | Launch, given the Open MPI 5.0.7 MPMD crash | Option B: one `mpirun -np N role-single-app.sh <foam-cmd>`; each copy reads its rank and `exec`s Yade or OpenFOAM |
+| D2 | Where the code lives | This repository |
+| D3 | Collective variant | Blocking neighbourhood collectives only, MPI-3.1. No non-blocking, no MPI-4 persistent, no build-time switch. Changing the variant later bumps the protocol version |
+| D4 | One Foam rank | A one-piece decomposition (`processor0/`); no serial path |
+| D5 | Remaining prototype checks | All four run (below); no upstream Open MPI/PMIx report for now |
+
 ## Prototype (`prototype/`)
 
 Throw-away code that answered the first box of #328. It will seed the core's mock sides and stress tests.
@@ -56,11 +67,27 @@ Throw-away code that answered the first box of #328. It will seed the core's moc
 | `mock/foamMockProto.C` | The same OpenFOAM side without OpenFOAM (`mpicxx`) |
 | `demSideProto.py` | mpi4py DEM side; it does the split that `yade.mpy` does |
 | `matrix.sh` | Runs layouts 1x1, 2x2, 1x3, 3x1 (DEM x Foam), `REPS` times each, with a 30 s timeout |
-| `host-run.sh` | All runs below; Open MPI 4.1 runs in an `ubuntu:24.04` container |
-| `role-single-app.sh` | Launch option B |
+| `host-run.sh` | Launch option A runs; Open MPI 4.1 runs in an `ubuntu:24.04` container |
+| `role-single-app.sh` | Launch option B; `DEMCMD` replaces the DEM command (e.g. real Yade) |
+| `check-launch-b.sh` | Option B on Open MPI 5.0.7 (host), Open MPI 4.1 (`ubuntu:24.04`) and MPICH 4.2.2 (`fedora:42`) |
+| `check-real-sides.sh` | Option B with real Yade (`YADE_BIN`), and the real v2606 side on Open MPI 4.1 (OpenFOAM's `ubuntu:24.04` packages) |
 | `results/` | Run summaries |
 
-Results (all launched with option A, 10 repeats per layout; summaries in `results/`):
+Each layout (1x1, 2x2, 1x3, 3x1) runs 10 times; a run passes only if both sides print their end line and `mpirun` returns 0 within 30 s. Summaries are in `results/`.
+
+**Launch option B** (with the thread-level check; Foam runs with `-mpi-threads`):
+
+| MPI | DEM side | Foam side | Result |
+|---|---|---|---|
+| Open MPI 5.0.7, Debian 13 | mpi4py | v2606 | 40/40 clean |
+| Open MPI 5.0.7, Debian 13 | mpi4py | mock | 40/40 clean |
+| Open MPI 5.0.7, Debian 13 | **Yade** (yade-pgf 475bb35, `import yade.mpy`, `O.step()` per exchange) | v2606 | 40/40 clean |
+| Open MPI 4.1.6, `ubuntu:24.04` | mpi4py | mock | 40/40 clean |
+| Open MPI 4.1.6, `ubuntu:24.04` | mpi4py | **v2606** (OpenFOAM packages) | 40/40 clean |
+| MPICH 4.2.2, `fedora:42` | mpi4py | mock | 40/40 clean |
+| MPICH 4.2.2, `fedora:42` | mpi4py | mock without `-mpi-threads` | handshake abort, rc 3 (no hang) |
+
+**Launch option A** (`mpirun A : B`, before the thread-level check):
 
 | MPI | Foam side | Result |
 |---|---|---|
@@ -69,10 +96,7 @@ Results (all launched with option A, 10 repeats per layout; summaries in `result
 | Open MPI 5.0.7 + `PMIX_MCA_pmdl=^ompi` | mock | 40/40 clean |
 | Open MPI 4.1.6, `ubuntu:24.04` | mock | 40/40 clean |
 
-Launch option B passed a 5-run smoke test on Open MPI 5.0.7 only.
-
 Not run yet:
-- option B on Open MPI 4.1 or MPICH;
-- the v2606 side on Open MPI 4.1;
-- real Yade;
-- more than one node.
+- more than one node;
+- the `DemSide` engine in C++ (the Yade check runs the Python toy inside Yade);
+- the `pgf pack` image.

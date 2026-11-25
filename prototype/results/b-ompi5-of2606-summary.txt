@@ -1,0 +1,4 @@
+b-ompi5-of2606 1xDEM 1xFOAM: 10 ok, 0 failed
+b-ompi5-of2606 2xDEM 2xFOAM: 10 ok, 0 failed
+b-ompi5-of2606 1xDEM 3xFOAM: 10 ok, 0 failed
+b-ompi5-of2606 3xDEM 1xFOAM: 10 ok, 0 failed
