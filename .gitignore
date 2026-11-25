@@ -3,3 +3,5 @@ prototype/runs/
 prototype/case/processor*/
 **/Make/linux64*/
 __pycache__/
+build/
+build-*/

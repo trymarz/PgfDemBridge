@@ -1,0 +1,27 @@
+name: tests
+on:
+  push:
+  pull_request:
+
+jobs:
+  core:
+    runs-on: ubuntu-24.04
+    strategy:
+      fail-fast: false
+      matrix:
+        mpi: [openmpi, mpich]
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install ${{ matrix.mpi }}
+        run: |
+          sudo apt-get update -qq
+          if [ ${{ matrix.mpi }} = openmpi ]; then pkgs="openmpi-bin libopenmpi-dev"; else pkgs="mpich libmpich-dev"; fi
+          sudo apt-get install -y -qq --no-install-recommends cmake g++ $pkgs
+          mpirun --version | head -2
+      - name: Build
+        run: |
+          flags=""; [ ${{ matrix.mpi }} = openmpi ] && flags="-DPGFDB_MPIEXEC_PREFLAGS=--oversubscribe"
+          cmake -S . -B build -DPGFDB_WERROR=ON $flags
+          cmake --build build -j
+      - name: Test (10 repeats; a hang fails at 60 s)
+        run: ctest --test-dir build --output-on-failure --repeat until-fail:10 --timeout 60
