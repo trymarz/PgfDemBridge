@@ -1,0 +1,12 @@
+  FAIL rc=139 runs/ompi5-mock-1x1-1.log
+  FAIL rc=139 runs/ompi5-mock-1x1-2.log
+ompi5-mock 1xDEM 1xFOAM: 0 ok, 2 failed
+  FAIL rc=139 runs/ompi5-mock-2x2-1.log
+  FAIL rc=139 runs/ompi5-mock-2x2-2.log
+ompi5-mock 2xDEM 2xFOAM: 0 ok, 2 failed
+  FAIL rc=139 runs/ompi5-mock-1x3-1.log
+  FAIL rc=139 runs/ompi5-mock-1x3-2.log
+ompi5-mock 1xDEM 3xFOAM: 0 ok, 2 failed
+  FAIL rc=139 runs/ompi5-mock-3x1-1.log
+  FAIL rc=139 runs/ompi5-mock-3x1-2.log
+ompi5-mock 3xDEM 1xFOAM: 0 ok, 2 failed

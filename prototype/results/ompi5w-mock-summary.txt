@@ -1,0 +1,4 @@
+ompi5w-mock 1xDEM 1xFOAM: 10 ok, 0 failed
+ompi5w-mock 2xDEM 2xFOAM: 10 ok, 0 failed
+ompi5w-mock 1xDEM 3xFOAM: 10 ok, 0 failed
+ompi5w-mock 3xDEM 1xFOAM: 10 ok, 0 failed

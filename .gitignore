@@ -1,0 +1,5 @@
+prototype/bin/
+prototype/runs/
+prototype/case/processor*/
+Make/linux64*/
+__pycache__/
