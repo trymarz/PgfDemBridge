@@ -20,6 +20,10 @@ jobs:
           cmake --build build -j
       - name: Test (10 repeats; a hang fails at 60 s)
         run: ctest --test-dir build --output-on-failure --repeat until-fail:10 --timeout 60
+      - name: Header check, non-CMake consumer (Open MPI 4.1 C++ bindings stay out)
+        run: |
+          mpicxx.openmpi -std=c++17 -fsyntax-only -Wall -Wextra -Wsuggest-override -Wcast-function-type \
+            -Werror -Isrc tests/headerCheck.cpp
 
   # Ubuntu 24.04's MPICH starts every rank as a singleton (world size 1);
   # Fedora's MPICH 4.2 works, as in tests/check-stacks.sh.

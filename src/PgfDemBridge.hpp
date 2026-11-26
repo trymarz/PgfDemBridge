@@ -34,6 +34,14 @@ a fatal error on either side ends both programs instead of hanging.
 \*---------------------------------------------------------------------------*/
 #pragma once
 
+// C API only: Open MPI <= 4.1 and MPICH otherwise pull the deprecated C++
+// bindings into every consumer, which fail -Wsuggest-override -Werror.
+#ifndef OMPI_SKIP_MPICXX
+#define OMPI_SKIP_MPICXX 1
+#endif
+#ifndef MPICH_SKIP_MPICXX
+#define MPICH_SKIP_MPICXX 1
+#endif
 #include <mpi.h>
 #include <array>
 #include <cstddef>

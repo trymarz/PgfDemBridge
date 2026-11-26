@@ -8,6 +8,9 @@ set(CMAKE_POSITION_INDEPENDENT_CODE ON)   # linked into OpenFOAM and Yade shared
 option(PGFDB_WERROR "Treat warnings as errors" OFF)
 set(PGFDB_MPIEXEC_PREFLAGS "" CACHE STRING "Extra mpiexec flags for the tests, e.g. --oversubscribe")
 
+# C API only: no libmpi_cxx, and FindMPI puts OMPI/MPICH_SKIP_MPICXX on MPI::MPI_CXX,
+# so consumers inherit them (Open MPI <= 4.1's C++ bindings fail -Wsuggest-override).
+set(MPI_CXX_SKIP_MPICXX ON CACHE BOOL "")
 find_package(MPI 3.1 REQUIRED COMPONENTS CXX)
 
 add_library(PgfDemBridge STATIC src/PgfDemBridge.cpp)
@@ -23,6 +26,12 @@ if(BUILD_TESTING)
         target_compile_options(${t} PRIVATE -Wall -Wextra $<$<BOOL:${PGFDB_WERROR}>:-Werror>)
     endforeach()
     add_test(NAME unit COMMAND unitTests)
+
+    # The header as consumers see it: MPI headers not as -isystem, Yade's strict warnings.
+    add_library(headerCheck OBJECT tests/headerCheck.cpp)
+    target_link_libraries(headerCheck PRIVATE PgfDemBridge)
+    set_target_properties(headerCheck PROPERTIES NO_SYSTEM_FROM_IMPORTED ON)
+    target_compile_options(headerCheck PRIVATE -Wall -Wextra -Wsuggest-override -Wcast-function-type -Werror)
 
     separate_arguments(preflags UNIX_COMMAND "${PGFDB_MPIEXEC_PREFLAGS}")
     # pgf_mpi_test(<name> <nDem> <nFoam> <demArgs> <foamArgs...>): launch option B via tests/role.sh.
