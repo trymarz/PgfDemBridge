@@ -4,27 +4,43 @@ on:
   pull_request:
 
 jobs:
-  core:
+  openmpi:
     runs-on: ubuntu-24.04
-    strategy:
-      fail-fast: false
-      matrix:
-        mpi: [openmpi, mpich]
     steps:
       - uses: actions/checkout@v4
-      - name: Install ${{ matrix.mpi }}
+      - name: Install Open MPI
         run: |
           sudo apt-get update -qq
-          if [ ${{ matrix.mpi }} = openmpi ]; then pkgs="openmpi-bin libopenmpi-dev"; else pkgs="mpich libmpich-dev"; fi
-          sudo apt-get install -y -qq --no-install-recommends cmake g++ $pkgs
-          mpiexec.${{ matrix.mpi }} --version | head -2
+          sudo apt-get install -y -qq --no-install-recommends cmake g++ openmpi-bin libopenmpi-dev
+          mpiexec.openmpi --version | head -1
       - name: Build
         run: |
-          # Pin compiler and launcher to the matrix MPI: a stray default mpiexec starts singletons.
-          flags=""; [ ${{ matrix.mpi }} = openmpi ] && flags="-DPGFDB_MPIEXEC_PREFLAGS=--oversubscribe"
-          cmake -S . -B build -DPGFDB_WERROR=ON $flags \
-            -DMPI_CXX_COMPILER=/usr/bin/mpicxx.${{ matrix.mpi }} -DMPIEXEC_EXECUTABLE=/usr/bin/mpiexec.${{ matrix.mpi }}
-          grep -E "^MPIEXEC_EXECUTABLE|^MPI_CXX_COMPILER" build/CMakeCache.txt
+          cmake -S . -B build -DPGFDB_WERROR=ON -DPGFDB_MPIEXEC_PREFLAGS=--oversubscribe \
+            -DMPI_CXX_COMPILER=/usr/bin/mpicxx.openmpi -DMPIEXEC_EXECUTABLE=/usr/bin/mpiexec.openmpi
           cmake --build build -j
       - name: Test (10 repeats; a hang fails at 60 s)
         run: ctest --test-dir build --output-on-failure --repeat until-fail:10 --timeout 60
+
+  # Ubuntu 24.04's MPICH starts every rank as a singleton (world size 1);
+  # Fedora's MPICH 4.2 works, as in tests/check-stacks.sh.
+  mpich:
+    runs-on: ubuntu-24.04
+    container:
+      image: fedora:42
+      options: --shm-size=1g
+    steps:
+      - name: Install MPICH
+        run: |
+          dnf install -y -q mpich mpich-devel cmake make gcc-c++ git
+          /usr/lib64/mpich/bin/mpichversion | head -1
+      - uses: actions/checkout@v4
+      - name: Build
+        run: |
+          export PATH=/usr/lib64/mpich/bin:$PATH
+          cmake -S . -B build -DPGFDB_WERROR=ON \
+            -DMPI_CXX_COMPILER=/usr/lib64/mpich/bin/mpicxx -DMPIEXEC_EXECUTABLE=/usr/lib64/mpich/bin/mpiexec
+          cmake --build build -j
+      - name: Test (10 repeats; a hang fails at 60 s)
+        run: |
+          export LD_LIBRARY_PATH=/usr/lib64/mpich/lib
+          ctest --test-dir build --output-on-failure --repeat until-fail:10 --timeout 60

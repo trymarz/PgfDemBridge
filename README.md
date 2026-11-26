@@ -98,7 +98,7 @@ cmake --build build -j && ctest --test-dir build
 - Foam rank `f` owns the slab `x in [f, f+1]`. DEM bodies drift in `x` (so the graph grows), sit on slab faces, leave the mesh, and are erased and inserted between steps.
 - Each value encodes the rank that found the body and the body's fields, so each side checks the other. After closing, an `MPI_Allreduce` on world checks that Foam's finds equal DEM's applied values.
 - 21 tests: unit tests; both lambdaModes on 1x1, 2x2, 1x3 and 3x1; closed slabs (double finds); early stop by either side, by one DEM rank only, and at step 0; Foam ranks before or between DEM ranks; and three handshake failures that must abort with a message.
-- CI (`.github/workflows/tests.yml`) runs them 10 times on Ubuntu 24.04 with Open MPI and with MPICH. `tests/check-stacks.sh` does the same in containers: Open MPI 4.1.6 (`ubuntu:24.04`) and MPICH 4.2.2 (`fedora:42`).
+- CI (`.github/workflows/tests.yml`) runs them 10 times with Open MPI 4.1 (Ubuntu 24.04) and MPICH 4.2 (a `fedora:42` container: Ubuntu 24.04's MPICH starts every rank alone). `tests/check-stacks.sh` does the same in containers: Open MPI 4.1.6 (`ubuntu:24.04`) and MPICH 4.2.2 (`fedora:42`).
 
 ## Prototype (`prototype/`)
 
