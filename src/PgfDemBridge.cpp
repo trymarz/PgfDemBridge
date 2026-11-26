@@ -27,8 +27,8 @@ const char* threadName(int t)
         case MPI_THREAD_FUNNELED: return "FUNNELED";
         case MPI_THREAD_SERIALIZED: return "SERIALIZED";
         case MPI_THREAD_MULTIPLE: return "MULTIPLE";
+        default: return "unknown";   // Yade builds with -Werror=switch-default
     }
-    return "unknown";
 }
 
 //- A non-null buffer: MPICH rejects null buffers even when a rank has no neighbours,
