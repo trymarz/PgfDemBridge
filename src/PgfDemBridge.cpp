@@ -1,11 +1,13 @@
 #include "PgfDemBridge.hpp"
 
 #include <algorithm>
+#include <chrono>
 #include <cmath>
 #include <cstdio>
 #include <cstdlib>
 #include <limits>
 #include <sstream>
+#include <thread>
 
 namespace PgfDemBridge
 {
@@ -27,6 +29,11 @@ const char* threadName(int t)
     }
     return "unknown";
 }
+
+//- A non-null buffer: MPICH rejects null buffers even when a rank has no neighbours,
+//  and an empty vector's data() may be null. Nothing is read or written through it.
+template<class T> T* nz(T* p) { static T none[1]{}; return p ? p : none; }
+double* const noDoubles = nz<double>(nullptr);
 
 int indexOf(const std::vector<int>& v, int x)
 {
@@ -77,6 +84,9 @@ void Bridge::fail(const std::string& msg) const
     const std::string full = "[PgfDemBridge] world rank " + std::to_string(r) + ": " + msg;
     if (!onError_) std::fprintf(stderr, "%s\n", full.c_str());
     else try { onError_(full); } catch (...) {}   // a throwing handler must still end the run
+    std::fflush(nullptr);
+    // MPICH's launcher may drop output still in flight when it kills the job; let it drain.
+    std::this_thread::sleep_for(std::chrono::milliseconds(500));
     MPI_Abort(world_, 3);
     std::abort();
 }
@@ -203,7 +213,7 @@ void Bridge::rebuildGraph(const std::vector<int>& foamPeers)
     (
         MPI_Dist_graph_create
         (
-            bridge_, n, src.data(), deg.data(), dst.data(),
+            bridge_, n, src.data(), deg.data(), nz(dst.data()),
             MPI_UNWEIGHTED, MPI_INFO_NULL, 0, &graph_
         ),
         "graph create"
@@ -218,7 +228,7 @@ void Bridge::rebuildGraph(const std::vector<int>& foamPeers)
     (
         MPI_Dist_graph_neighbors
         (
-            graph_, nIn, in_.data(), MPI_UNWEIGHTED, nOut, out_.data(), MPI_UNWEIGHTED
+            graph_, nIn, nz(in_.data()), MPI_UNWEIGHTED, nOut, nz(out_.data()), MPI_UNWEIGHTED
         ),
         "graph neighbours"
     );
@@ -269,7 +279,7 @@ const std::vector<double>& FoamSide::receive()
     const int su = strideUp;
     std::vector<int> zero(std::max(in_.size(), out_.size()), 0);
     inCount_.assign(in_.size(), 0);
-    check(MPI_Neighbor_alltoall(zero.data(), 1, MPI_INT, inCount_.data(), 1, MPI_INT, graph_), "counts");
+    check(MPI_Neighbor_alltoall(nz(zero.data()), 1, MPI_INT, nz(inCount_.data()), 1, MPI_INT, graph_), "counts");
 
     std::vector<int> rc(in_.size()), rd(in_.size());
     inDispl_.assign(in_.size(), 0);
@@ -286,8 +296,8 @@ const std::vector<double>& FoamSide::receive()
     (
         MPI_Neighbor_alltoallv
         (
-            nullptr, zero.data(), zero.data(), MPI_DOUBLE,
-            up_.data(), rc.data(), rd.data(), MPI_DOUBLE, graph_
+            noDoubles, nz(zero.data()), nz(zero.data()), MPI_DOUBLE,
+            nz(up_.data()), nz(rc.data()), nz(rd.data()), MPI_DOUBLE, graph_
         ),
         "bodies up"
     );
@@ -312,8 +322,8 @@ void FoamSide::reply(const double* values, double dt, bool done)
     (
         MPI_Neighbor_alltoallv
         (
-            values, sc.data(), sd.data(), MPI_DOUBLE,
-            nullptr, zero.data(), zero.data(), MPI_DOUBLE, graph_
+            nz(values), nz(sc.data()), nz(sd.data()), MPI_DOUBLE,
+            noDoubles, nz(zero.data()), nz(zero.data()), MPI_DOUBLE, graph_
         ),
         "values down"
     );
@@ -380,7 +390,7 @@ Control DemSide::exchange(const double* up, std::size_t n, double* values)
         cnt[k] = int(recBody.size()) - disp[k];
     }
     std::vector<int> dummy(in_.size(), 0);
-    check(MPI_Neighbor_alltoall(cnt.data(), 1, MPI_INT, dummy.data(), 1, MPI_INT, graph_), "counts");
+    check(MPI_Neighbor_alltoall(nz(cnt.data()), 1, MPI_INT, nz(dummy.data()), 1, MPI_INT, graph_), "counts");
 
     std::vector<int> sc(nOut), sd(nOut);
     for (std::size_t k = 0; k < nOut; ++k) { sc[k] = su*cnt[k]; sd[k] = su*disp[k]; }
@@ -389,8 +399,8 @@ Control DemSide::exchange(const double* up, std::size_t n, double* values)
     (
         MPI_Neighbor_alltoallv
         (
-            buf.data(), sc.data(), sd.data(), MPI_DOUBLE,
-            nullptr, zero.data(), zero.data(), MPI_DOUBLE, graph_
+            nz(buf.data()), nz(sc.data()), nz(sd.data()), MPI_DOUBLE,
+            noDoubles, nz(zero.data()), nz(zero.data()), MPI_DOUBLE, graph_
         ),
         "bodies up"
     );
@@ -407,8 +417,8 @@ Control DemSide::exchange(const double* up, std::size_t n, double* values)
     (
         MPI_Neighbor_alltoallv
         (
-            nullptr, zero.data(), zero.data(), MPI_DOUBLE,
-            back.data(), rc.data(), rd.data(), MPI_DOUBLE, graph_
+            noDoubles, nz(zero.data()), nz(zero.data()), MPI_DOUBLE,
+            nz(back.data()), nz(rc.data()), nz(rd.data()), MPI_DOUBLE, graph_
         ),
         "values down"
     );
