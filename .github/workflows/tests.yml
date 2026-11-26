@@ -17,11 +17,14 @@ jobs:
           sudo apt-get update -qq
           if [ ${{ matrix.mpi }} = openmpi ]; then pkgs="openmpi-bin libopenmpi-dev"; else pkgs="mpich libmpich-dev"; fi
           sudo apt-get install -y -qq --no-install-recommends cmake g++ $pkgs
-          mpirun --version | head -2
+          mpiexec.${{ matrix.mpi }} --version | head -2
       - name: Build
         run: |
+          # Pin compiler and launcher to the matrix MPI: a stray default mpiexec starts singletons.
           flags=""; [ ${{ matrix.mpi }} = openmpi ] && flags="-DPGFDB_MPIEXEC_PREFLAGS=--oversubscribe"
-          cmake -S . -B build -DPGFDB_WERROR=ON $flags
+          cmake -S . -B build -DPGFDB_WERROR=ON $flags \
+            -DMPI_CXX_COMPILER=/usr/bin/mpicxx.${{ matrix.mpi }} -DMPIEXEC_EXECUTABLE=/usr/bin/mpiexec.${{ matrix.mpi }}
+          grep -E "^MPIEXEC_EXECUTABLE|^MPI_CXX_COMPILER" build/CMakeCache.txt
           cmake --build build -j
       - name: Test (10 repeats; a hang fails at 60 s)
         run: ctest --test-dir build --output-on-failure --repeat until-fail:10 --timeout 60
