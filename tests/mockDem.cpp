@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
 // Mock DemSide: repeats yade.mpy's split at import (yade-pgf py/mpy.py:211), then sends its
 // bodies and checks every value. Options: -thread single|multiple (mpi4py: multiple),
 // -expect-mode M, -closed (as mockFoam), -stop-at K (close before exchange K),

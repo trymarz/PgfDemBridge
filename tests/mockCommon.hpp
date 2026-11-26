@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
 // Geometry and values shared by the mock sides, so each side can check the other.
 // Foam rank f owns the slab x in [f, f+1], y and z in [0, 1].
 #pragma once

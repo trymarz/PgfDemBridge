@@ -1,4 +1,5 @@
 #!/bin/bash
+# SPDX-License-Identifier: GPL-3.0-or-later
 # Core tests x10 on the stacks the host lacks: Open MPI 4.1.6 (ubuntu:24.04) and MPICH 4.2.2 (fedora:42).
 # Usage: [STACKS="ompi41 mpich"] tests/check-stacks.sh > log 2>&1 (needs docker); build trees go to build-<stack>/.
 # --shm-size: MPICH keeps its shared memory in /dev/shm, and Docker's 64 MB default gives SIGBUS.

@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
 /*---------------------------------------------------------------------------*\
 PgfDemBridge: coupling protocol v2 between porousGasificationFoam (OpenFOAM)
 and Yade DEM (yade-pgf). Plain C++17 and MPI-3.1; no OpenFOAM or Yade headers.

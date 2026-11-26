@@ -144,3 +144,7 @@ Not run yet:
 - more than one node;
 - the `DemSide` engine in C++ (the Yade check runs the Python toy inside Yade);
 - the `pgf pack` image.
+
+## Licence
+
+GPL-3.0-or-later; see `LICENSE`. porousGasificationFoam and yade-pgf include this repository as a git submodule.

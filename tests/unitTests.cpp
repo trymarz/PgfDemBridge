@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
 // Unit tests of the core's MPI-free parts: layout and box containment.
 #include "PgfDemBridge.hpp"
 #include <cstdio>

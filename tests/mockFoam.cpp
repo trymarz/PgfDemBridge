@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
 // Mock FoamSide: repeats OpenFOAM v2606's -mpi-split-by-appnum (src/Pstream/mpi/UPstream.C:244,544),
 // then answers every body it finds in its slab. Options: -steps N, -mode 0|1, -mpi-threads,
 // -closed (closed slabs: bodies on a face are found twice), -stop-at K (close before exchange K).
